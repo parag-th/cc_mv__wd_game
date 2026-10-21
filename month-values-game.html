@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Date Codes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    --bg: #14123a;
+    --bg-deep: #0d0c28;
+    --panel: #1d1a52;
+    --panel-line: #34306f;
+    --ink: #f4f2ff;
+    --muted: #a8a4d6;
+    --accent: #ffb238;
+    --accent-ink: #1d1a52;
+    --good: #4fd8a8;
+    --bad: #ff6f7d;
+    --font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+    --font-body: 'Inter', 'Segoe UI', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); min-height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    min-height: 100vh; margin: 0; background: var(--bg);
+    background-image: radial-gradient(circle at 1px 1px, var(--panel-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color: var(--ink); font-family: var(--font-body);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; overflow-x: hidden;
+  }
+  .stage { width: 100%; max-width: 480px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--panel-line);
+    border-radius: 20px; padding: 32px 28px; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; top: -60px; right: -60px;
+    width: 160px; height: 160px; background: var(--accent); opacity: 0.12;
+    border-radius: 40%; transform: rotate(18deg); pointer-events: none;
+  }
+  button { font-family: var(--font-body); cursor: pointer; border: none; outline-offset: 3px; background: none; }
+
+  /* ---------- Start screen ---------- */
+  .start-view.hidden { display: none; }
+  .start-view h1 {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(28px, 6vw, 36px); line-height: 1.15; margin: 0 0 6px;
+  }
+  .start-view .range { color: var(--accent); }
+  .start-view p.lede { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0 0 22px; max-width: 38ch; }
+
+  .seg {
+    display: flex; gap: 6px; background: var(--bg-deep); border: 1px solid var(--panel-line);
+    border-radius: 14px; padding: 4px; margin: 0 0 16px;
+  }
+  .seg-btn {
+    flex: 1; min-width: 0; padding: 10px 6px; border-radius: 10px; color: var(--muted);
+    font-size: 13.5px; font-weight: 600; line-height: 1.25; transition: background 120ms ease, color 120ms ease;
+  }
+  .seg-btn:hover:not(.active) { color: var(--ink); }
+  .seg-btn.active { background: var(--accent); color: var(--accent-ink); }
+  .seg-btn:focus-visible { outline: 2px solid var(--ink); }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  .stat-box { background: var(--bg-deep); border: 1px solid var(--panel-line); border-radius: 14px; padding: 14px 16px; }
+  .stat-box .stat-label { color: var(--muted); font-size: 12.5px; letter-spacing: 0.01em; }
+  .stat-box .stat-value { font-family: var(--font-display); font-size: 24px; font-weight: 600; margin-top: 2px; }
+  .stat-box .stat-sub { color: var(--muted); font-size: 12px; margin-top: 2px; min-height: 15px; }
+
+  .btn-primary {
+    width: 100%; background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; font-size: 17px; padding: 16px; border-radius: 14px;
+    transition: transform 120ms ease, filter 120ms ease;
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:focus-visible { outline: 2px solid var(--ink); }
+
+  .timer-note { color: var(--muted); font-size: 13px; margin-top: 16px; text-align: center; }
+  .timer-note b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Game screen ---------- */
+  .game-view { display: none; }
+  .game-view.active { display: block; }
+
+  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+  .metric .metric-label { color: var(--muted); font-size: 12px; }
+  .metric .metric-value { font-family: var(--font-display); font-size: 26px; font-weight: 600; }
+  .metric.right { text-align: right; }
+
+  .timer-track { height: 6px; background: var(--bg-deep); border-radius: 3px; overflow: hidden; margin-bottom: 22px; }
+  .timer-fill {
+    height: 100%; width: 100%; background: var(--accent); border-radius: 3px;
+    transition: width 60ms linear, background-color 200ms ease;
+  }
+  .timer-fill.urgent { background: var(--bad); }
+
+  .streak-line { color: var(--muted); font-size: 13px; margin: 0 0 18px; min-height: 18px; }
+  .streak-line b { color: var(--accent); font-weight: 600; }
+
+  .progress-label { text-align: center; color: var(--muted); font-size: 12.5px; }
+  .equation {
+    font-family: var(--font-display); font-weight: 600;
+    font-size: clamp(56px, 16vw, 80px); text-align: center; margin: 6px 0 2px; letter-spacing: 0.01em; line-height: 1.1;
+  }
+  .equation.wide { font-size: clamp(34px, 10vw, 50px); margin-bottom: 6px; padding: 12px 0; }
+  .month-full { text-align: center; color: var(--muted); font-size: 14px; margin-bottom: 22px; min-height: 20px; }
+
+  form.answer-form { display: flex; gap: 10px; }
+  input[type="number"] {
+    flex: 1; min-width: 0; background: var(--bg-deep); border: 1.5px solid var(--panel-line);
+    border-radius: 14px; color: var(--ink); font-family: var(--font-display);
+    font-size: 22px; text-align: center; padding: 14px 10px; -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"]:focus { outline: none; border-color: var(--accent); }
+
+  .btn-check {
+    background: var(--ink); color: var(--bg-deep); font-weight: 600;
+    font-size: 16px; padding: 0 22px; border-radius: 14px;
+  }
+  .btn-check:focus-visible { outline: 2px solid var(--accent); }
+  .btn-check:disabled { opacity: 0.5; cursor: default; }
+
+  .feedback { min-height: 30px; margin-top: 18px; font-size: 15px; font-weight: 500; text-align: center; }
+  .feedback.correct { color: var(--good); }
+  .feedback.incorrect { color: var(--bad); }
+
+  .end-row { margin-top: 22px; text-align: center; }
+  .link-btn {
+    background: none; color: var(--muted); font-size: 13.5px;
+    text-decoration: underline; text-underline-offset: 3px; padding: 6px;
+  }
+  .link-btn:hover { color: var(--ink); }
+
+  /* ---------- Summary screen ---------- */
+  .summary-view { display: none; }
+  .summary-view.active { display: block; }
+  .summary-view h2 { font-family: var(--font-display); font-size: 26px; margin: 0 0 4px; }
+  .summary-view .summary-sub { color: var(--muted); font-size: 14px; margin: 0 0 16px; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .new-best {
+    display: inline-block; color: var(--accent-ink); background: var(--accent);
+    font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: 100px; margin-bottom: 16px;
+  }
+  .summary-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 24px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card { animation: rise 320ms ease; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="card">
+
+    <!-- START SCREEN -->
+    <div class="start-view" id="startView">
+      <h1>Date <span class="range">codes</span></h1>
+
+      <div class="seg" id="modeSeg" role="group" aria-label="Choose a game">
+        <button type="button" class="seg-btn active" data-mode="months">Month values</button>
+        <button type="button" class="seg-btn" data-mode="century">Century code</button>
+        <button type="button" class="seg-btn" data-mode="weekday">Weekday value</button>
+      </div>
+
+      <p class="lede" id="ledeText"></p>
+
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-label">High score</div><div class="stat-value" id="highScoreDisplay">0</div></div>
+        <div class="stat-box"><div class="stat-label">Best streak</div><div class="stat-value" id="highStreakDisplay">0</div></div>
+        <div class="stat-box"><div class="stat-label">Best correct</div><div class="stat-value" id="highCorrectDisplay">0</div></div>
+        <div class="stat-box">
+          <div class="stat-label">Best time</div>
+          <div class="stat-value" id="highTimeDisplay">&ndash;</div>
+          <div class="stat-sub" id="highTimeSub">&nbsp;</div>
+        </div>
+      </div>
+
+      <button type="button" class="btn-primary" id="startBtn">Start</button>
+      <div class="timer-note"><b>5 seconds</b> per question</div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div class="game-view" id="gameView">
+      <div class="top-bar">
+        <div class="metric">
+          <div class="metric-label">Score</div>
+          <div class="metric-value" id="scoreDisplay">0</div>
+        </div>
+        <div class="metric right">
+          <div class="metric-label">High score</div>
+          <div class="metric-value" id="liveHighScore">0</div>
+        </div>
+      </div>
+
+      <div class="timer-track"><div class="timer-fill" id="timerFill"></div></div>
+
+      <div class="streak-line" id="streakLine">&nbsp;</div>
+
+      <div class="progress-label" id="progressLabel">1 of 12</div>
+      <div class="equation" id="equationDisplay">Jan</div>
+      <div class="month-full" id="monthFull">January</div>
+
+      <form class="answer-form" id="answerForm" autocomplete="off">
+        <input type="number" id="answerInput" inputmode="numeric" placeholder="?" aria-label="Your answer" min="0" max="6" required>
+        <button type="submit" class="btn-check" id="checkBtn">Check</button>
+      </form>
+
+      <div class="feedback" id="feedback">&nbsp;</div>
+
+      <div class="end-row">
+        <button class="link-btn" id="endBtn">End game</button>
+      </div>
+    </div>
+
+    <!-- SUMMARY SCREEN -->
+    <div class="summary-view" id="summaryView">
+      <h2 id="summaryHeading">Game over</h2>
+      <p class="summary-sub" id="summarySub">You ended the round early.</p>
+
+      <div class="badge-row">
+        <div id="newBestBadge" style="display:none;" class="new-best">New high score</div>
+        <div id="newBestTimeBadge" style="display:none;" class="new-best">New best time</div>
+      </div>
+
+      <div class="summary-stats">
+        <div class="stat-box"><div class="stat-label">Final score</div><div class="stat-value" id="finalScore">0</div></div>
+        <div class="stat-box"><div class="stat-label">Correct</div><div class="stat-value" id="finalCorrect">0</div></div>
+        <div class="stat-box"><div class="stat-label">Incorrect</div><div class="stat-value" id="finalIncorrect">0</div></div>
+        <div class="stat-box"><div class="stat-label">Best streak</div><div class="stat-value" id="finalStreak">0</div></div>
+        <div class="stat-box"><div class="stat-label">Time taken</div><div class="stat-value" id="finalTime">&ndash;</div></div>
+        <div class="stat-box">
+          <div class="stat-label">Best time</div>
+          <div class="stat-value" id="finalBestTime">&ndash;</div>
+          <div class="stat-sub" id="finalBestTimeSub">&nbsp;</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="playAgainBtn">Play again</button>
+      <div class="end-row">
+        <button class="link-btn" id="homeBtn">Back to start</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const QUESTION_SECONDS = 5;          // fixed for both games
+  const LIMIT_MS = QUESTION_SECONDS * 1000;
+  const CORRECT_POINTS = 10;
+  const INCORRECT_POINTS = -4;
+
+  const MONTHS = [
+    { abbr: "Jan", full: "January",   value: 0 },
+    { abbr: "Feb", full: "February",  value: 3 },
+    { abbr: "Mar", full: "March",     value: 3 },
+    { abbr: "Apr", full: "April",     value: 6 },
+    { abbr: "May", full: "May",       value: 1 },
+    { abbr: "Jun", full: "June",      value: 4 },
+    { abbr: "Jul", full: "July",      value: 6 },
+    { abbr: "Aug", full: "August",    value: 2 },
+    { abbr: "Sep", full: "September", value: 5 },
+    { abbr: "Oct", full: "October",   value: 0 },
+    { abbr: "Nov", full: "November",  value: 3 },
+    { abbr: "Dec", full: "December",  value: 5 }
+  ];
+
+  // remainder -> century code
+  const CENTURY = [
+    { r: 0, code: 0 },
+    { r: 1, code: 5 },
+    { r: 2, code: 3 },
+    { r: 3, code: 1 }
+  ];
+  const CENTURY_PASSES = 3;            // each remainder comes up 3 times per round (12 questions)
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  // Repeats a list `passes` times, each pass shuffled, never the same item twice in a row.
+  function buildPasses(list, passes) {
+    const out = [];
+    for (let pass = 0; pass < passes; pass++) {
+      const block = shuffle(list.slice());
+      if (out.length && block[0] === out[out.length - 1]) {
+        const t = block[0]; block[0] = block[1]; block[1] = t;
+      }
+      block.forEach(function (x) { out.push(x); });
+    }
+    return out;
+  }
+
+  function buildMonthQueue() {
+    return shuffle(MONTHS.map(function (m) {
+      return { prompt: m.abbr, sub: m.full, name: m.abbr, value: m.value };
+    }));
+  }
+
+  function buildCenturyQueue() {
+    return buildPasses(CENTURY, CENTURY_PASSES).map(function (c) {
+      return { prompt: String(c.r), sub: "Remainder", name: "Remainder " + c.r, value: c.code };
+    });
+  }
+
+  // weekday -> value (Sunday = 0 ... Saturday = 6)
+  const WEEKDAYS = [
+    { name: "Sunday",    value: 0 },
+    { name: "Monday",    value: 1 },
+    { name: "Tuesday",   value: 2 },
+    { name: "Wednesday", value: 3 },
+    { name: "Thursday",  value: 4 },
+    { name: "Friday",    value: 5 },
+    { name: "Saturday",  value: 6 }
+  ];
+  const WEEKDAY_PASSES = 2;            // each day comes up twice per round (14 questions)
+
+  function buildWeekdayQueue() {
+    return buildPasses(WEEKDAYS, WEEKDAY_PASSES).map(function (d) {
+      return { prompt: d.name, sub: "Day of the week", name: d.name, value: d.value };
+    });
+  }
+
+  const MODES = {
+    months: {
+      keys: { score: "monthValues_highScore", streak: "monthValues_bestStreak", correct: "monthValues_bestCorrect", time: "monthValues_bestTime" },
+      lede: "You'll see a month. Type its value. All 12 months come up once per round.",
+      done: "You've been through all 12 months.",
+      build: buildMonthQueue
+    },
+    century: {
+      keys: { score: "centuryCodes_highScore", streak: "centuryCodes_bestStreak", correct: "centuryCodes_bestCorrect", time: "centuryCodes_bestTime" },
+      lede: "You'll see a remainder (0\u20133). Type its century code. Each remainder comes up three times per round.",
+      done: "You've been through all 12 questions.",
+      build: buildCenturyQueue
+    },
+    weekday: {
+      keys: { score: "weekdayValues_highScore", streak: "weekdayValues_bestStreak", correct: "weekdayValues_bestCorrect", time: "weekdayValues_bestTime" },
+      lede: "You'll see a day of the week. Type its value. Each day comes up twice per round.",
+      done: "You've been through every day twice.",
+      build: buildWeekdayQueue
+    }
+  };
+
+  const MODE_KEY = "dateCodes_selectedMode";
+
+  /* ---------- storage ---------- */
+  function loadNumber(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const n = raw === null ? 0 : parseInt(raw, 10);
+      return Number.isFinite(n) ? n : 0;
+    } catch (e) { return 0; }
+  }
+  function saveNumber(key, value) { try { localStorage.setItem(key, String(value)); } catch (e) {} }
+
+  // Best time record: fewer incorrect always wins; with equal incorrect, the faster time wins.
+  function loadTimeRecord(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const obj = raw ? JSON.parse(raw) : null;
+      return obj && Number.isFinite(obj.incorrect) && Number.isFinite(obj.ms) ? obj : null;
+    } catch (e) { return null; }
+  }
+  function saveTimeRecord(key, rec) { try { localStorage.setItem(key, JSON.stringify(rec)); } catch (e) {} }
+
+  function formatTime(ms) {
+    if (!ms || ms <= 0) return "\u2013";
+    const total = ms / 1000;
+    if (total < 60) return total.toFixed(1) + "s";
+    const m = Math.floor(total / 60);
+    const sec = total - m * 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec.toFixed(1);
+  }
+
+  /* ---------- DOM ---------- */
+  const $ = function (id) { return document.getElementById(id); };
+  const startView = $("startView"), gameView = $("gameView"), summaryView = $("summaryView");
+  const modeSeg = $("modeSeg"), ledeText = $("ledeText");
+  const highScoreDisplay = $("highScoreDisplay"), highStreakDisplay = $("highStreakDisplay");
+  const highCorrectDisplay = $("highCorrectDisplay"), highTimeDisplay = $("highTimeDisplay"), highTimeSub = $("highTimeSub");
+  const startBtn = $("startBtn");
+
+  const scoreDisplay = $("scoreDisplay"), liveHighScore = $("liveHighScore"), streakLine = $("streakLine");
+  const progressLabel = $("progressLabel"), equationDisplay = $("equationDisplay"), monthFull = $("monthFull");
+  const answerForm = $("answerForm"), answerInput = $("answerInput"), checkBtn = $("checkBtn");
+  const feedback = $("feedback"), timerFill = $("timerFill"), endBtn = $("endBtn");
+
+  const summaryHeading = $("summaryHeading"), summarySub = $("summarySub");
+  const newBestBadge = $("newBestBadge"), newBestTimeBadge = $("newBestTimeBadge");
+  const finalScore = $("finalScore"), finalCorrect = $("finalCorrect"), finalIncorrect = $("finalIncorrect");
+  const finalStreak = $("finalStreak"), finalTime = $("finalTime");
+  const finalBestTime = $("finalBestTime"), finalBestTimeSub = $("finalBestTimeSub");
+  const playAgainBtn = $("playAgainBtn"), homeBtn = $("homeBtn");
+
+  /* ---------- state ---------- */
+  let selectedMode = "months";   // what the start screen is showing
+  let gameMode = "months";       // what the running game is using
+  let activeHigh = 0;
+
+  let score = 0, correctCount = 0, incorrectCount = 0, streak = 0, sessionBestStreak = 0;
+  let totalAnswerMs = 0, questionStart = 0;
+  let current = null, queue = [], queueIndex = 0;
+  let awaitingNext = false, advanceTimer = null, countdownInterval = null;
+
+  /* ---------- start screen ---------- */
+  function refreshStartStats() {
+    const keys = MODES[selectedMode].keys;
+    ledeText.textContent = MODES[selectedMode].lede;
+    highScoreDisplay.textContent = loadNumber(keys.score);
+    highStreakDisplay.textContent = loadNumber(keys.streak);
+    highCorrectDisplay.textContent = loadNumber(keys.correct);
+    const rec = loadTimeRecord(keys.time);
+    if (rec) {
+      highTimeDisplay.textContent = formatTime(rec.ms);
+      highTimeSub.textContent = rec.incorrect + " incorrect";
+    } else {
+      highTimeDisplay.textContent = "\u2013";
+      highTimeSub.innerHTML = "&nbsp;";
+    }
+  }
+
+  function selectMode(mode) {
+    if (!MODES[mode]) mode = "months";
+    selectedMode = mode;
+    try { localStorage.setItem(MODE_KEY, mode); } catch (e) {}
+    modeSeg.querySelectorAll(".seg-btn").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.mode === mode);
+    });
+    refreshStartStats();
+  }
+
+  modeSeg.addEventListener("click", function (e) {
+    const btn = e.target.closest(".seg-btn");
+    if (btn) selectMode(btn.dataset.mode);
+  });
+
+  /* ---------- timer ---------- */
+  function stopCountdown() {
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  }
+
+  function startCountdown() {
+    stopCountdown();
+    timerFill.style.width = "100%";
+    timerFill.classList.remove("urgent");
+    questionStart = performance.now();
+    countdownInterval = setInterval(function () {
+      const remaining = LIMIT_MS - (performance.now() - questionStart);
+      timerFill.style.width = Math.max(0, (remaining / LIMIT_MS) * 100) + "%";
+      if (remaining <= LIMIT_MS * 0.3) timerFill.classList.add("urgent");
+      if (remaining <= 0) { stopCountdown(); handleTimeout(); }
+    }, 30);
+  }
+
+  function updateStreakLine() {
+    streakLine.innerHTML = streak >= 2 ? "Streak: <b>" + streak + "</b> in a row" : "\u00A0";
+  }
+
+  /* ---------- game ---------- */
+  function newQuestion() {
+    if (queueIndex >= queue.length) { endGame(true); return; }
+    current = queue[queueIndex];
+    queueIndex += 1;
+
+    progressLabel.textContent = queueIndex + " of " + queue.length;
+    equationDisplay.textContent = current.prompt;
+    equationDisplay.classList.toggle("wide", current.prompt.length > 4);
+    monthFull.textContent = current.sub;
+
+    answerInput.value = "";
+    feedback.textContent = "\u00A0";
+    feedback.className = "feedback";
+    checkBtn.disabled = false;
+    answerInput.disabled = false;
+    awaitingNext = false;
+    answerInput.focus();
+    startCountdown();
+  }
+
+  function startGame(mode) {
+    gameMode = mode;
+    queue = MODES[gameMode].build();
+    queueIndex = 0;
+    score = 0; correctCount = 0; incorrectCount = 0; streak = 0; sessionBestStreak = 0;
+    totalAnswerMs = 0;
+    activeHigh = loadNumber(MODES[gameMode].keys.score);
+    scoreDisplay.textContent = "0";
+    liveHighScore.textContent = activeHigh;
+    updateStreakLine();
+
+    startView.classList.add("hidden");
+    summaryView.classList.remove("active");
+    gameView.classList.add("active");
+    newQuestion();
+  }
+
+  function finishAnswer(isCorrect, given) {
+    totalAnswerMs += given === null ? LIMIT_MS : Math.min(LIMIT_MS, performance.now() - questionStart);
+    stopCountdown();
+    awaitingNext = true;
+    checkBtn.disabled = true;
+    answerInput.disabled = true;
+
+    if (isCorrect) {
+      score += CORRECT_POINTS;
+      correctCount += 1;
+      streak += 1;
+      if (streak > sessionBestStreak) sessionBestStreak = streak;
+      feedback.textContent = "Correct \u2014 +" + CORRECT_POINTS;
+      feedback.className = "feedback correct";
+    } else {
+      score = Math.max(0, score + INCORRECT_POINTS);
+      incorrectCount += 1;
+      streak = 0;
+      feedback.textContent = (given === null ? "Time's up" : "Not quite") +
+        " \u2014 " + current.name + " is " + current.value + " (" + INCORRECT_POINTS + ")";
+      feedback.className = "feedback incorrect";
+    }
+
+    scoreDisplay.textContent = score;
+    if (score > activeHigh) liveHighScore.textContent = score;
+    updateStreakLine();
+
+    advanceTimer = setTimeout(newQuestion, isCorrect ? 700 : 1400);
+  }
+
+  function handleTimeout() {
+    if (awaitingNext) return;
+    finishAnswer(false, null);
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (awaitingNext) return;
+    const raw = answerInput.value;
+    if (raw === "") return;
+    const given = parseInt(raw, 10);
+    finishAnswer(given === current.value, given);
+  }
+
+  function endGame(completed) {
+    if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+    stopCountdown();
+
+    gameView.classList.remove("active");
+    summaryView.classList.add("active");
+
+    const keys = MODES[gameMode].keys;
+
+    let isNewBest = false;
+    if (score > loadNumber(keys.score)) { saveNumber(keys.score, score); isNewBest = true; }
+    if (sessionBestStreak > loadNumber(keys.streak)) saveNumber(keys.streak, sessionBestStreak);
+    if (correctCount > loadNumber(keys.correct)) saveNumber(keys.correct, correctCount);
+
+    // Best time: full rounds only. Fewer incorrect beats everything; equal incorrect -> faster time wins.
+    const elapsedMs = completed ? Math.round(totalAnswerMs) : 0;
+    let rec = loadTimeRecord(keys.time);
+    let isNewBestTime = false;
+    if (completed && elapsedMs > 0 &&
+        (!rec || incorrectCount < rec.incorrect || (incorrectCount === rec.incorrect && elapsedMs < rec.ms))) {
+      rec = { incorrect: incorrectCount, ms: elapsedMs };
+      saveTimeRecord(keys.time, rec);
+      isNewBestTime = true;
+    }
+
+    summaryHeading.textContent = completed ? "Round complete" : "Game over";
+    summarySub.textContent = completed ? MODES[gameMode].done : "You ended the round early.";
+
+    finalScore.textContent = score;
+    finalCorrect.textContent = correctCount;
+    finalIncorrect.textContent = incorrectCount;
+    finalStreak.textContent = sessionBestStreak;
+    finalTime.textContent = completed ? formatTime(elapsedMs) : "\u2013";
+    if (rec) {
+      finalBestTime.textContent = formatTime(rec.ms);
+      finalBestTimeSub.textContent = rec.incorrect + " incorrect";
+    } else {
+      finalBestTime.textContent = "\u2013";
+      finalBestTimeSub.innerHTML = "&nbsp;";
+    }
+    newBestBadge.style.display = isNewBest ? "inline-block" : "none";
+    newBestTimeBadge.style.display = isNewBestTime ? "inline-block" : "none";
+
+    refreshStartStats();
+  }
+
+  startBtn.addEventListener("click", function () { startGame(selectedMode); });
+  playAgainBtn.addEventListener("click", function () { startGame(gameMode); });
+  homeBtn.addEventListener("click", function () {
+    summaryView.classList.remove("active");
+    startView.classList.remove("hidden");
+    selectMode(gameMode);
+  });
+  endBtn.addEventListener("click", function () { endGame(false); });
+  answerForm.addEventListener("submit", handleSubmit);
+
+  let savedMode = "months";
+  try { savedMode = localStorage.getItem(MODE_KEY) || "months"; } catch (e) {}
+  selectMode(savedMode);
+})();
+</script>
+
+</body>
+</html>
