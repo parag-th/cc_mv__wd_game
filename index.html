@@ -57,7 +57,7 @@
   .start-view p.lede { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 0 0 22px; max-width: 38ch; }
 
   .seg {
-    display: flex; gap: 6px; background: var(--bg-deep); border: 1px solid var(--panel-line);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg-deep); border: 1px solid var(--panel-line);
     border-radius: 14px; padding: 4px; margin: 0 0 16px;
   }
   .seg-btn {
@@ -67,6 +67,24 @@
   .seg-btn:hover:not(.active) { color: var(--ink); }
   .seg-btn.active { background: var(--accent); color: var(--accent-ink); }
   .seg-btn:focus-visible { outline: 2px solid var(--ink); }
+  .stat-box.wide { grid-column: 1 / -1; }
+  .stat-box .stat-sub.good { color: var(--good); }
+
+  .pause-btn {
+    align-self: center; background: var(--bg-deep); border: 1.5px solid var(--panel-line); color: var(--ink);
+    font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 100px;
+    transition: border-color 120ms ease;
+  }
+  .pause-btn:hover { border-color: var(--accent); }
+  .pause-btn:focus-visible { outline: 2px solid var(--accent); }
+  .pause-overlay {
+    display: none; position: absolute; inset: 0; z-index: 5; background: var(--panel);
+    flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 28px;
+  }
+  .pause-overlay.show { display: flex; }
+  .pause-overlay h2 { font-family: var(--font-display); font-size: 28px; margin: 0 0 8px; }
+  .pause-overlay p { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 22px; max-width: 30ch; }
+  .pause-overlay .btn-primary { max-width: 260px; }
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
   .stat-box { background: var(--bg-deep); border: 1px solid var(--panel-line); border-radius: 14px; padding: 14px 16px; }
   .stat-box .stat-label { color: var(--muted); font-size: 12.5px; letter-spacing: 0.01em; }
@@ -163,6 +181,14 @@
 <div class="stage">
   <div class="card">
 
+    <!-- PAUSE OVERLAY (covers the question so it can't be seen while paused) -->
+    <div class="pause-overlay" id="pauseOverlay" role="dialog" aria-label="Game paused">
+      <h2>Paused</h2>
+      <p>The timer is stopped and the question is hidden. Take your time.</p>
+      <button type="button" class="btn-primary" id="resumeBtn">Resume</button>
+      <div class="end-row"><button type="button" class="link-btn" id="pauseEndBtn">End game</button></div>
+    </div>
+
     <!-- START SCREEN -->
     <div class="start-view" id="startView">
       <h1>Date <span class="range">codes</span></h1>
@@ -171,6 +197,7 @@
         <button type="button" class="seg-btn active" data-mode="months">Month values</button>
         <button type="button" class="seg-btn" data-mode="century">Century code</button>
         <button type="button" class="seg-btn" data-mode="weekday">Weekday value</button>
+        <button type="button" class="seg-btn" data-mode="centuryYear">Century year code</button>
       </div>
 
       <p class="lede" id="ledeText"></p>
@@ -183,6 +210,11 @@
           <div class="stat-label">Best time</div>
           <div class="stat-value" id="highTimeDisplay">&ndash;</div>
           <div class="stat-sub" id="highTimeSub">&nbsp;</div>
+        </div>
+        <div class="stat-box wide">
+          <div class="stat-label">Avg of best 5 times</div>
+          <div class="stat-value" id="avgBestDisplay">&ndash;</div>
+          <div class="stat-sub" id="avgBestSub">&nbsp;</div>
         </div>
       </div>
 
@@ -197,6 +229,7 @@
           <div class="metric-label">Score</div>
           <div class="metric-value" id="scoreDisplay">0</div>
         </div>
+        <button type="button" class="pause-btn" id="pauseBtn" title="Pause (Esc)">Pause</button>
         <div class="metric right">
           <div class="metric-label">High score</div>
           <div class="metric-value" id="liveHighScore">0</div>
@@ -238,11 +271,20 @@
         <div class="stat-box"><div class="stat-label">Correct</div><div class="stat-value" id="finalCorrect">0</div></div>
         <div class="stat-box"><div class="stat-label">Incorrect</div><div class="stat-value" id="finalIncorrect">0</div></div>
         <div class="stat-box"><div class="stat-label">Best streak</div><div class="stat-value" id="finalStreak">0</div></div>
-        <div class="stat-box"><div class="stat-label">Time taken</div><div class="stat-value" id="finalTime">&ndash;</div></div>
+        <div class="stat-box">
+          <div class="stat-label">Time taken</div>
+          <div class="stat-value" id="finalTime">&ndash;</div>
+          <div class="stat-sub" id="finalTimeSub">&nbsp;</div>
+        </div>
         <div class="stat-box">
           <div class="stat-label">Best time</div>
           <div class="stat-value" id="finalBestTime">&ndash;</div>
           <div class="stat-sub" id="finalBestTimeSub">&nbsp;</div>
+        </div>
+        <div class="stat-box wide">
+          <div class="stat-label">Avg of best 5 times</div>
+          <div class="stat-value" id="finalAvgBest">&ndash;</div>
+          <div class="stat-sub" id="finalAvgBestSub">&nbsp;</div>
         </div>
       </div>
 
@@ -339,24 +381,45 @@
     });
   }
 
+  // century year code: number -> code
+  const CENTURY_YEAR = [
+    { n: 0, code: 6 },
+    { n: 1, code: 4 },
+    { n: 2, code: 2 },
+    { n: 3, code: 0 }
+  ];
+  const CENTURY_YEAR_PASSES = 3;       // each number comes up 3 times per round (12 questions)
+
+  function buildCenturyYearQueue() {
+    return buildPasses(CENTURY_YEAR, CENTURY_YEAR_PASSES).map(function (c) {
+      return { prompt: String(c.n), sub: "Century year", name: "Century year " + c.n, value: c.code };
+    });
+  }
+
   const MODES = {
     months: {
-      keys: { score: "monthValues_highScore", streak: "monthValues_bestStreak", correct: "monthValues_bestCorrect", time: "monthValues_bestTime" },
+      keys: { score: "monthValues_highScore", streak: "monthValues_bestStreak", correct: "monthValues_bestCorrect", time: "monthValues_bestTime", top: "monthValues_topTimes" },
       lede: "You'll see a month. Type its value. All 12 months come up once per round.",
       done: "You've been through all 12 months.",
       build: buildMonthQueue
     },
     century: {
-      keys: { score: "centuryCodes_highScore", streak: "centuryCodes_bestStreak", correct: "centuryCodes_bestCorrect", time: "centuryCodes_bestTime" },
+      keys: { score: "centuryCodes_highScore", streak: "centuryCodes_bestStreak", correct: "centuryCodes_bestCorrect", time: "centuryCodes_bestTime", top: "centuryCodes_topTimes" },
       lede: "You'll see a remainder (0\u20133). Type its century code. Each remainder comes up three times per round.",
       done: "You've been through all 12 questions.",
       build: buildCenturyQueue
     },
     weekday: {
-      keys: { score: "weekdayValues_highScore", streak: "weekdayValues_bestStreak", correct: "weekdayValues_bestCorrect", time: "weekdayValues_bestTime" },
+      keys: { score: "weekdayValues_highScore", streak: "weekdayValues_bestStreak", correct: "weekdayValues_bestCorrect", time: "weekdayValues_bestTime", top: "weekdayValues_topTimes" },
       lede: "You'll see a day of the week. Type its value. Each day comes up twice per round.",
       done: "You've been through every day twice.",
       build: buildWeekdayQueue
+    },
+    centuryYear: {
+      keys: { score: "centuryYearCodes_highScore", streak: "centuryYearCodes_bestStreak", correct: "centuryYearCodes_bestCorrect", time: "centuryYearCodes_bestTime", top: "centuryYearCodes_topTimes" },
+      lede: "You'll see a number (0\u20133). Type its century year code. Each number comes up three times per round.",
+      done: "You've been through all 12 questions.",
+      build: buildCenturyYearQueue
     }
   };
 
@@ -381,6 +444,52 @@
     } catch (e) { return null; }
   }
   function saveTimeRecord(key, rec) { try { localStorage.setItem(key, JSON.stringify(rec)); } catch (e) {} if (window.cloudSave) window.cloudSave(); }
+
+  // "Best 5" list: your five best completed rounds, ranked like the best time
+  // (fewer incorrect first, then faster). Each entry is { incorrect, ms, t } where t = when it was set.
+  const TOP_N = 5;
+  function validEntry(e) { return e && Number.isFinite(e.incorrect) && Number.isFinite(e.ms) && e.ms > 0; }
+  function sortTop(list) {
+    return list.slice().sort(function (a, b) { return (a.incorrect - b.incorrect) || (a.ms - b.ms); });
+  }
+  function loadTopList(keys) {
+    let list = null;
+    try {
+      const raw = localStorage.getItem(keys.top);
+      if (raw !== null) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) list = arr.filter(validEntry);
+      }
+    } catch (e) {}
+    if (list === null) {
+      // first run after this update: start the list from your existing best time, if you have one
+      const rec = loadTimeRecord(keys.time);
+      list = rec ? [{ incorrect: rec.incorrect, ms: rec.ms, t: 0 }] : [];
+    }
+    return sortTop(list).slice(0, TOP_N);
+  }
+  function saveTopList(key, list) {
+    try { localStorage.setItem(key, JSON.stringify(list)); } catch (e) {}
+    if (window.cloudSave) window.cloudSave();
+  }
+  // Average of the best 5 (only once there are 5 rounds to average).
+  function avgOf(list) {
+    if (list.length < TOP_N) return null;
+    let ms = 0, inc = 0;
+    list.forEach(function (e) { ms += e.ms; inc += e.incorrect; });
+    return { ms: ms / list.length, incorrect: inc / list.length };
+  }
+  function renderAvg(list, valueEl, subEl) {
+    const a = avgOf(list);
+    if (!a) {
+      valueEl.textContent = "\u2013";
+      subEl.textContent = list.length + " of " + TOP_N + " rounds played";
+      return;
+    }
+    valueEl.textContent = formatTime(a.ms);
+    const inc = Number.isInteger(a.incorrect) ? String(a.incorrect) : a.incorrect.toFixed(1);
+    subEl.textContent = "avg " + inc + " incorrect";
+  }
 
   function formatTime(ms) {
     if (!ms || ms <= 0) return "\u2013";
@@ -410,6 +519,9 @@
   const finalStreak = $("finalStreak"), finalTime = $("finalTime");
   const finalBestTime = $("finalBestTime"), finalBestTimeSub = $("finalBestTimeSub");
   const playAgainBtn = $("playAgainBtn"), homeBtn = $("homeBtn");
+  const avgBestDisplay = $("avgBestDisplay"), avgBestSub = $("avgBestSub");
+  const finalAvgBest = $("finalAvgBest"), finalAvgBestSub = $("finalAvgBestSub"), finalTimeSub = $("finalTimeSub");
+  const pauseBtn = $("pauseBtn"), pauseOverlay = $("pauseOverlay"), resumeBtn = $("resumeBtn"), pauseEndBtn = $("pauseEndBtn");
 
   /* ---------- state ---------- */
   let selectedMode = "months";   // what the start screen is showing
@@ -420,6 +532,7 @@
   let totalAnswerMs = 0, questionStart = 0;
   let current = null, queue = [], queueIndex = 0;
   let awaitingNext = false, advanceTimer = null, countdownInterval = null;
+  let paused = false, pausedAt = 0, advanceDue = 0, pendingAdvanceMs = 0;
 
   /* ---------- start screen ---------- */
   function refreshStartStats() {
@@ -436,6 +549,7 @@
       highTimeDisplay.textContent = "\u2013";
       highTimeSub.innerHTML = "&nbsp;";
     }
+    renderAvg(loadTopList(keys), avgBestDisplay, avgBestSub);
   }
 
   function selectMode(mode) {
@@ -463,6 +577,11 @@
     timerFill.style.width = "100%";
     timerFill.classList.remove("urgent");
     questionStart = performance.now();
+    runCountdown();
+  }
+
+  function runCountdown() {
+    stopCountdown();
     countdownInterval = setInterval(function () {
       const remaining = LIMIT_MS - (performance.now() - questionStart);
       timerFill.style.width = Math.max(0, (remaining / LIMIT_MS) * 100) + "%";
@@ -498,6 +617,8 @@
 
   function startGame(mode) {
     gameMode = mode;
+    paused = false;
+    pauseOverlay.classList.remove("show");
     queue = MODES[gameMode].build();
     queueIndex = 0;
     score = 0; correctCount = 0; incorrectCount = 0; streak = 0; sessionBestStreak = 0;
@@ -540,7 +661,9 @@
     if (score > activeHigh) liveHighScore.textContent = score;
     updateStreakLine();
 
-    advanceTimer = setTimeout(newQuestion, isCorrect ? 700 : 1400);
+    const delay = isCorrect ? 700 : 1400;
+    advanceDue = performance.now() + delay;
+    advanceTimer = setTimeout(newQuestion, delay);
   }
 
   function handleTimeout() {
@@ -550,7 +673,7 @@
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (awaitingNext) return;
+    if (awaitingNext || paused) return;
     const raw = answerInput.value;
     if (raw === "") return;
     const given = parseInt(raw, 10);
@@ -558,6 +681,8 @@
   }
 
   function endGame(completed) {
+    paused = false;
+    pauseOverlay.classList.remove("show");
     if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
     stopCountdown();
 
@@ -573,6 +698,16 @@
 
     // Best time: full rounds only. Fewer incorrect beats everything; equal incorrect -> faster time wins.
     const elapsedMs = completed ? Math.round(totalAnswerMs) : 0;
+
+    // Average of best 5: compare against the average as it stood BEFORE this round, then add this round.
+    const topBefore = loadTopList(keys);
+    const avgBefore = avgOf(topBefore);
+    let topAfter = topBefore;
+    if (completed && elapsedMs > 0) {
+      topAfter = sortTop(topBefore.concat([{ incorrect: incorrectCount, ms: elapsedMs, t: Date.now() }])).slice(0, TOP_N);
+      saveTopList(keys.top, topAfter);
+    }
+
     let rec = loadTimeRecord(keys.time);
     let isNewBestTime = false;
     if (completed && elapsedMs > 0 &&
@@ -597,11 +732,68 @@
       finalBestTime.textContent = "\u2013";
       finalBestTimeSub.innerHTML = "&nbsp;";
     }
+    renderAvg(topAfter, finalAvgBest, finalAvgBestSub);
+    finalTimeSub.className = "stat-sub";
+    if (completed && avgBefore) {
+      const diff = elapsedMs - avgBefore.ms;
+      finalTimeSub.textContent = (Math.abs(diff) / 1000).toFixed(1) + "s " + (diff < 0 ? "faster" : "slower") + " than your avg";
+      if (diff < 0) finalTimeSub.classList.add("good");
+    } else {
+      finalTimeSub.innerHTML = "&nbsp;";
+    }
     newBestBadge.style.display = isNewBest ? "inline-block" : "none";
     newBestTimeBadge.style.display = isNewBestTime ? "inline-block" : "none";
 
     refreshStartStats();
   }
+
+  /* ---------- pause (works in every game) ---------- */
+  function gameIsActive() { return gameView.classList.contains("active"); }
+
+  function pauseGame() {
+    if (paused || !gameIsActive()) return;
+    paused = true;
+    pausedAt = performance.now();
+    stopCountdown();
+    if (advanceTimer) {
+      // paused during the feedback pause: remember how long was left before the next question
+      clearTimeout(advanceTimer);
+      advanceTimer = null;
+      pendingAdvanceMs = Math.max(0, advanceDue - pausedAt);
+    }
+    answerInput.blur();
+    pauseOverlay.classList.add("show");
+    resumeBtn.focus();
+  }
+
+  function resumeGame() {
+    if (!paused) return;
+    paused = false;
+    const now = performance.now();
+    pauseOverlay.classList.remove("show");
+    if (awaitingNext) {
+      advanceDue = now + pendingAdvanceMs;
+      advanceTimer = setTimeout(newQuestion, pendingAdvanceMs);
+    } else {
+      questionStart += now - pausedAt;   // paused time doesn't count against the question or your total time
+      runCountdown();
+      answerInput.focus();
+    }
+  }
+
+  pauseBtn.addEventListener("click", pauseGame);
+  resumeBtn.addEventListener("click", resumeGame);
+  pauseEndBtn.addEventListener("click", function () { endGame(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && gameIsActive()) {
+      e.preventDefault();
+      if (paused) resumeGame(); else pauseGame();
+    }
+  });
+  // Switching tabs or minimising the window pauses automatically.
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) pauseGame();
+  });
 
   startBtn.addEventListener("click", function () { startGame(selectedMode); });
   playAgainBtn.addEventListener("click", function () { startGame(gameMode); });
@@ -651,9 +843,10 @@
 
   // localStorage keys this game syncs (the selected-mode preference stays per-device).
   // e.g. monthValues_highScore, centuryCodes_bestTime, weekdayValues_bestStreak
-  const PREFIXES = ["monthValues_", "centuryCodes_", "weekdayValues_"];
+  const PREFIXES = ["monthValues_", "centuryCodes_", "centuryYearCodes_", "weekdayValues_"];
   const isOurs = function (k) { return typeof k === "string" && PREFIXES.some(function (p) { return k.startsWith(p); }); };
   const isTime = function (k) { return k.endsWith("_bestTime"); }; // stored as {incorrect, ms}
+  const isTop = function (k) { return k.endsWith("_topTimes"); };   // stored as a list of {incorrect, ms, t}
 
   const statusEl = document.getElementById("syncStatus");
   const googleBtn = document.getElementById("googleBtn");
@@ -672,12 +865,33 @@
     } catch (e) { return null; }
   }
 
+  // Accepts an array or a JSON string; returns a clean list of {incorrect, ms, t}.
+  function topList(v) {
+    try {
+      const arr = typeof v === "string" ? JSON.parse(v) : v;
+      if (!Array.isArray(arr)) return [];
+      return arr.filter(function (o) { return o && Number.isFinite(o.incorrect) && Number.isFinite(o.ms) && o.ms > 0; })
+        .map(function (o) { return { incorrect: o.incorrect, ms: o.ms, t: Number.isFinite(o.t) ? o.t : 0 }; });
+    } catch (e) { return []; }
+  }
+  // Union of two lists, duplicates (same round) removed, best 5 kept.
+  function mergeTop(a, b) {
+    const seen = new Set(), out = [];
+    topList(a).concat(topList(b)).forEach(function (e) {
+      const id = e.t + "|" + e.incorrect + "|" + e.ms;
+      if (!seen.has(id)) { seen.add(id); out.push(e); }
+    });
+    out.sort(function (x, y) { return (x.incorrect - y.incorrect) || (x.ms - y.ms); });
+    return out.slice(0, 5);
+  }
+
   function readLocal() {
     const out = {};
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (!isOurs(k)) continue;
       if (isTime(k)) { const r = rec(localStorage.getItem(k)); if (r) out[k] = r; }
+      else if (isTop(k)) { const l = topList(localStorage.getItem(k)); if (l.length) out[k] = l; }
       else out[k] = num(localStorage.getItem(k));
     }
     return out;
@@ -687,6 +901,7 @@
     Object.keys(scores).forEach(function (k) {
       if (!isOurs(k)) return;
       if (isTime(k)) { const r = rec(scores[k]); if (r) localStorage.setItem(k, JSON.stringify(r)); }
+      else if (isTop(k)) { const l = topList(scores[k]); if (l.length) localStorage.setItem(k, JSON.stringify(l)); }
       else localStorage.setItem(k, String(num(scores[k])));
     });
   }
@@ -698,6 +913,11 @@
     const out = {};
     new Set([...Object.keys(a), ...Object.keys(b)]).forEach(function (k) {
       if (!isOurs(k)) return;
+      if (isTop(k)) {
+        const l = mergeTop(a[k], b[k]);
+        if (l.length) out[k] = l;
+        return;
+      }
       if (isTime(k)) {
         const x = rec(a[k]), y = rec(b[k]);
         if (!x && !y) return;
@@ -785,6 +1005,7 @@
       Object.keys(old).forEach(function (k) {
         if (!isOurs(k)) return;
         if (isTime(k)) { const r = rec(old[k]); if (r) imported[k] = r; }
+        else if (isTop(k)) { const l = topList(old[k]); if (l.length) imported[k] = l; }
         else imported[k] = num(old[k]);
       });
       const count = Object.keys(imported).length;
